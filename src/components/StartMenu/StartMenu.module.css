@@ -1,0 +1,61 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 9998;
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(var(--taskbar-height) + 8px);
+  left: 8px;
+  width: 280px;
+  background: rgba(22, 26, 40, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 9999;
+}
+
+.header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  padding: 4px 8px 10px;
+}
+
+.appGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.appItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #c0c8d8;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.appItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.appIcon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.appName {
+  font-size: 11px;
+  color: #8090a8;
+}

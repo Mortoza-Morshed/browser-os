@@ -1,0 +1,36 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --taskbar-height: 44px;
+  --titlebar-height: 32px;
+  --window-min-width: 240px;
+  --window-min-height: 160px;
+  --window-border-radius: 10px;
+  --window-shadow: 0 8px 32px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.18);
+  --window-shadow-focused: 0 16px 48px rgba(0, 0, 0, 0.38), 0 4px 12px rgba(0, 0, 0, 0.22);
+  --desktop-bg: #1a1f2e;
+  --taskbar-bg: rgba(15, 18, 28, 0.85);
+  --titlebar-bg: #2a2f3f;
+  --titlebar-bg-focused: #323848;
+  --titlebar-text: #c0c8d8;
+  --window-bg: #1e2230;
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  background: var(--desktop-bg);
+  color: #e0e6f0;
+  user-select: none;
+}
