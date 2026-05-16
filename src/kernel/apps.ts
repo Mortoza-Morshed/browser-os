@@ -15,7 +15,7 @@ export const APP_REGISTRY: AppManifest[] = [
     id: "terminal",
     name: "Terminal",
     icon: "⌨",
-    defaultSize: { width: 560, height: 360 },
+    defaultSize: { width: 620, height: 400 }, // ← wider and taller
     component: Terminal,
   },
   {
