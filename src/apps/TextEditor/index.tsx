@@ -1,10 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { FsEntry } from "../../kernel/fs";
 import { readFile, writeFile, listDir } from "../../kernel/fs";
 import styles from "./TextEditor.module.css";
 
-export default function TextEditor() {
-  const [currentPath, setCurrentPath] = useState<string | null>(null);
+interface Props {
+  initialPath?: string;
+}
+
+export default function TextEditor({ initialPath }: Props) {
+  const [currentPath, setCurrentPath] = useState<string | null>(initialPath ?? null);
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(true);
   const [picking, setPicking] = useState(false);
@@ -16,6 +20,12 @@ export default function TextEditor() {
     setFiles(docs.filter((e) => e.kind === "file"));
     setPicking(true);
   }, []);
+
+  useEffect(() => {
+    if (initialPath) {
+      openFile(initialPath);
+    }
+  }, [initialPath]);
 
   const openFile = async (path: string) => {
     const text = await readFile(path);

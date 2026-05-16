@@ -11,13 +11,14 @@ export interface WindowRect {
 }
 
 export interface OsWindow {
-  id: WindowId;
-  appId: AppId;
-  title: string;
-  rect: WindowRect;
-  state: WindowState;
-  zIndex: number;
-  prevRect: WindowRect | null;
+  id: WindowId
+  appId: AppId
+  title: string
+  rect: WindowRect
+  state: WindowState
+  zIndex: number
+  prevRect: WindowRect | null
+  initialProps?: Record<string, unknown>
 }
 
 export interface AppManifest {

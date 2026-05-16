@@ -1,96 +1,122 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { FsEntry } from '../../kernel/fs'
-import { listDir, mkdir, deleteEntry, writeFile } from '../../kernel/fs'
-import styles from './FileManager.module.css'
+import { useState, useEffect, useCallback } from "react";
+import type { FsEntry } from "../../kernel/fs";
+import { listDir, mkdir, deleteEntry, writeFile } from "../../kernel/fs";
+import styles from "./FileManager.module.css";
+import { useWindowStore } from "../../store/windowStore";
+import { APP_REGISTRY } from "../../kernel/apps";
 
 export default function FileManager() {
-  const [path, setPath] = useState('/home/user')
-  const [entries, setEntries] = useState<FsEntry[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
-  const [renaming, setRenaming] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [path, setPath] = useState("/home/user");
+  const [entries, setEntries] = useState<FsEntry[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const openWindow = useWindowStore((s) => s.openWindow);
 
   const refresh = useCallback(async () => {
     try {
-      const list = await listDir(path)
-      setEntries(list)
-      setError(null)
+      const list = await listDir(path);
+      setEntries(list);
+      setError(null);
     } catch (e) {
-      setError('Could not read directory.')
+      setError("Could not read directory.");
     }
-  }, [path])
+  }, [path]);
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const navigate = (entry: FsEntry) => {
-    if (entry.kind === 'directory') {
-      setPath(entry.path)
-      setSelected(null)
+    if (entry.kind === "directory") {
+      setPath(entry.path);
+      setSelected(null);
+    } else {
+      // Open file in Text Editor
+      const editorApp = APP_REGISTRY.find((a) => a.id === "text-editor")!;
+      openWindow({
+        appId: editorApp.id,
+        title: entry.name,
+        defaultSize: editorApp.defaultSize,
+        initialProps: { initialPath: entry.path },
+      });
     }
-  }
+  };
 
   const goUp = () => {
-    const parts = path.split('/').filter(Boolean)
-    if (parts.length <= 1) return
-    parts.pop()
-    setPath('/' + parts.join('/'))
-    setSelected(null)
-  }
+    const parts = path.split("/").filter(Boolean);
+    if (parts.length <= 1) return;
+    parts.pop();
+    setPath("/" + parts.join("/"));
+    setSelected(null);
+  };
 
   const handleNewFolder = async () => {
-    const name = prompt('Folder name:')
-    if (!name) return
-    await mkdir(`${path}/${name}`)
-    refresh()
-  }
+    const name = prompt("Folder name:");
+    if (!name) return;
+    await mkdir(`${path}/${name}`);
+    refresh();
+  };
 
   const handleNewFile = async () => {
-    const name = prompt('File name (e.g. notes.txt):')
-    if (!name) return
-    await writeFile(`${path}/${name}`, '')
-    refresh()
-  }
+    const name = prompt("File name (e.g. notes.txt):");
+    if (!name) return;
+    await writeFile(`${path}/${name}`, "");
+    refresh();
+  };
 
   const handleDelete = async () => {
-    if (!selected) return
-    if (!confirm(`Delete "${selected.split('/').pop()}"?`)) return
-    await deleteEntry(selected)
-    setSelected(null)
-    refresh()
-  }
+    if (!selected) return;
+    if (!confirm(`Delete "${selected.split("/").pop()}"?`)) return;
+    await deleteEntry(selected);
+    setSelected(null);
+    refresh();
+  };
 
   const startRename = (entry: FsEntry) => {
-    setRenaming(entry.path)
-    setRenameValue(entry.name)
-  }
+    setRenaming(entry.path);
+    setRenameValue(entry.name);
+  };
 
   const commitRename = async (entry: FsEntry) => {
     if (!renameValue || renameValue === entry.name) {
-      setRenaming(null)
-      return
+      setRenaming(null);
+      return;
     }
-    const newPath = `${path}/${renameValue}`
+    const newPath = `${path}/${renameValue}`;
     // For dirs, we can't easily rename — so just create new dir
     // Full rename support comes when we add move() in a later phase
-    if (entry.kind === 'file') {
-      const { rename } = await import('../../kernel/fs')
-      await rename(entry.path, newPath)
+    if (entry.kind === "file") {
+      const { rename } = await import("../../kernel/fs");
+      await rename(entry.path, newPath);
     }
-    setRenaming(null)
-    refresh()
-  }
+    setRenaming(null);
+    refresh();
+  };
 
   return (
     <div className={styles.container}>
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        <button className={styles.toolBtn} onClick={goUp} title="Go up">↑</button>
+        <button className={styles.toolBtn} onClick={goUp} title="Go up">
+          ↑
+        </button>
         <span className={styles.pathBar}>{path}</span>
-        <button className={styles.toolBtn} onClick={handleNewFolder} title="New folder">+ Folder</button>
-        <button className={styles.toolBtn} onClick={handleNewFile} title="New file">+ File</button>
+        <button className={styles.toolBtn} onClick={handleNewFolder} title="New folder">
+          + Folder
+        </button>
+        <button className={styles.toolBtn} onClick={handleNewFile} title="New file">
+          + File
+        </button>
         {selected && (
-          <button className={styles.toolBtn} onClick={handleDelete} title="Delete" style={{ color: '#fc8181' }}>
+          <button
+            className={styles.toolBtn}
+            onClick={handleDelete}
+            title="Delete"
+            style={{ color: "#fc8181" }}
+          >
             Delete
           </button>
         )}
@@ -99,19 +125,15 @@ export default function FileManager() {
       {/* File list */}
       <div className={styles.fileList}>
         {error && <div className={styles.error}>{error}</div>}
-        {entries.length === 0 && !error && (
-          <div className={styles.empty}>Empty folder</div>
-        )}
+        {entries.length === 0 && !error && <div className={styles.empty}>Empty folder</div>}
         {entries.map((entry) => (
           <div
             key={entry.path}
-            className={`${styles.entry} ${selected === entry.path ? styles.selected : ''}`}
+            className={`${styles.entry} ${selected === entry.path ? styles.selected : ""}`}
             onClick={() => setSelected(entry.path)}
             onDoubleClick={() => navigate(entry)}
           >
-            <span className={styles.entryIcon}>
-              {entry.kind === 'directory' ? '📁' : '📄'}
-            </span>
+            <span className={styles.entryIcon}>{entry.kind === "directory" ? "📁" : "📄"}</span>
 
             {renaming === entry.path ? (
               <input
@@ -121,8 +143,8 @@ export default function FileManager() {
                 onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={() => commitRename(entry)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename(entry)
-                  if (e.key === 'Escape') setRenaming(null)
+                  if (e.key === "Enter") commitRename(entry);
+                  if (e.key === "Escape") setRenaming(null);
                 }}
                 onClick={(e) => e.stopPropagation()}
               />
@@ -130,9 +152,9 @@ export default function FileManager() {
               <span
                 className={styles.entryName}
                 onDoubleClick={(e) => {
-                  if (entry.kind === 'file') {
-                    e.stopPropagation()
-                    startRename(entry)
+                  if (entry.kind === "file") {
+                    e.stopPropagation();
+                    startRename(entry);
                   }
                 }}
               >
@@ -143,5 +165,5 @@ export default function FileManager() {
         ))}
       </div>
     </div>
-  )
+  );
 }
