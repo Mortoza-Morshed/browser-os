@@ -33,7 +33,10 @@ export function createShell() {
   }
 
   // ── Command handlers ────────────────────────────────────────────
-  const commands: Record<string, (args: string[], out: OutputFn) => Promise<void> | void> = {
+  const commands: Record<
+    string,
+    (args: string[], out: OutputFn, clearFn?: () => void) => Promise<void> | void
+  > = {
     help: (_args, out) => {
       out("Available commands:");
       out("  ls [path]         list directory contents");
@@ -157,28 +160,38 @@ export function createShell() {
       Object.entries(ctx.env).forEach(([k, v]) => out(`${k}=${v}`));
     },
 
-    clear: (_args, out) => {
-      // Special sentinel — terminal will handle this
-      out("\x1b[2J\x1b[H");
+    clear: (_args, _out, clearFn) => {
+      clearFn?.();
     },
   };
 
   // ── Main execute function ───────────────────────────────────────
-  async function execute(input: string, out: OutputFn): Promise<void> {
+  async function execute(input: string, out: OutputFn, clearFn?: () => void): Promise<boolean> {
     const trimmed = input.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
-    // Basic tokenizer — splits by spaces, respects quoted strings
     const tokens = trimmed.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
     const [cmd, ...args] = tokens.map((t) => t.replace(/^['"]|['"]$/g, ""));
 
     const handler = commands[cmd];
     if (!handler) {
       out(`\x1b[31m${cmd}: command not found\x1b[0m`);
-      return;
+      return false;
     }
 
-    await handler(args, out);
+    let didClear = false;
+
+    if (cmd === "clear") {
+      didClear = true;
+      setTimeout(() => {
+        clearFn?.();
+        // clearFn will call term.clear() and write the prompt
+      }, 0);
+    } else {
+      await handler(args, out);
+    }
+
+    return didClear;
   }
 
   function getPrompt(): string {

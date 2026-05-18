@@ -108,17 +108,28 @@ export default function Terminal() {
         const input = inputBufferRef.current;
         inputBufferRef.current = "";
         term.writeln("");
-        // Record non-empty commands to history
+
         if (input.trim()) {
-          historyRef.current.unshift(input); // newest first
+          historyRef.current.unshift(input);
           historyIndexRef.current = -1;
         }
 
-        await shell.execute(input, (text) => {
-          term.writeln(text);
-        });
+        const didClear = await shell.execute(
+          input,
+          (text) => {
+            term.writeln(text);
+          },
+          () => {
+            setTimeout(() => {
+              term.clear();
+              term.write(shell.getPrompt());
+            }, 0);
+          },
+        );
 
-        term.write(shell.getPrompt());
+        if (!didClear) {
+          term.write(shell.getPrompt());
+        }
         return;
       }
 
@@ -141,9 +152,8 @@ export default function Terminal() {
 
       // Ctrl+L (clear)
       if (data === "\x0c") {
-        term.write("\x1b[2J\x1b[H");
+        term.clear();
         inputBufferRef.current = "";
-        term.write(shell.getPrompt());
         return;
       }
 
