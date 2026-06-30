@@ -1,14 +1,18 @@
 import { useState, useCallback, useEffect } from "react";
 import type { FsEntry } from "../../kernel/fs";
-import { kernel } from '../../kernel/kernelClient';
+import { kernel } from "../../kernel/kernelClient";
 import styles from "./TextEditor.module.css";
+import { useDialogStore } from "../../store/dialogStore";
 
 interface Props {
   initialPath?: string;
 }
 
 export default function TextEditor({ initialPath }: Props) {
-  const [currentPath, setCurrentPath] = useState<string | null>(initialPath ?? null);
+  const { prompt } = useDialogStore();
+  const [currentPath, setCurrentPath] = useState<string | null>(
+    initialPath ?? null,
+  );
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(true);
   const [picking, setPicking] = useState(false);
@@ -37,7 +41,7 @@ export default function TextEditor({ initialPath }: Props) {
 
   const save = async () => {
     if (!currentPath) {
-      const name = prompt("Save as (e.g. notes.txt):");
+      const name = await prompt("Save file", "notes.txt");
       if (!name) return;
       const path = `/home/user/documents/${name}`;
       await kernel.writeFile(path, content);
@@ -67,7 +71,10 @@ export default function TextEditor({ initialPath }: Props) {
         <button className={styles.toolBtn} onClick={loadFilePicker}>
           Open
         </button>
-        <button className={`${styles.toolBtn} ${!saved ? styles.unsaved : ""}`} onClick={save}>
+        <button
+          className={`${styles.toolBtn} ${!saved ? styles.unsaved : ""}`}
+          onClick={save}
+        >
           {saved ? "Saved" : "Save"}
         </button>
         <span className={styles.filename}>
@@ -81,13 +88,22 @@ export default function TextEditor({ initialPath }: Props) {
         <div className={styles.picker}>
           <div className={styles.pickerHeader}>
             Open from documents
-            <button className={styles.pickerClose} onClick={() => setPicking(false)}>
+            <button
+              className={styles.pickerClose}
+              onClick={() => setPicking(false)}
+            >
               ✕
             </button>
           </div>
-          {files.length === 0 && <div className={styles.pickerEmpty}>No files yet</div>}
+          {files.length === 0 && (
+            <div className={styles.pickerEmpty}>No files yet</div>
+          )}
           {files.map((f) => (
-            <div key={f.path} className={styles.pickerItem} onClick={() => openFile(f.path)}>
+            <div
+              key={f.path}
+              className={styles.pickerItem}
+              onClick={() => openFile(f.path)}
+            >
               📄 {f.name}
             </div>
           ))}

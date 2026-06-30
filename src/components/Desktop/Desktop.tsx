@@ -1,7 +1,8 @@
 import { useWindowStore } from "../../store/windowStore";
-import Window from "../Window/Window.tsx";
-import Taskbar from "../Taskbar/Taskbar.tsx";
-import styles from "./Desktop.module.css";
+import Window from "../Window/Window";
+import Taskbar from "../Taskbar/Taskbar";
+import DialogHost from "../DialogHost/DialogHost";
+import styles from "./Desktop.module.css";  
 
 export default function Desktop() {
   const windows = useWindowStore((s) => s.windows);
@@ -12,6 +13,7 @@ export default function Desktop() {
         <Window key={win.id} window={win} />
       ))}
       <Taskbar />
+      <DialogHost />
     </div>
   );
 }

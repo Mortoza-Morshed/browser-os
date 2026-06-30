@@ -4,6 +4,7 @@ import styles from "./FileManager.module.css";
 import { kernel } from "../../kernel/kernelClient";
 import { useWindowStore } from "../../store/windowStore";
 import { APP_REGISTRY } from "../../kernel/apps";
+import { useDialogStore } from '../../store/dialogStore'
 
 export default function FileManager() {
   const [path, setPath] = useState("/home/user");
@@ -12,6 +13,8 @@ export default function FileManager() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const { prompt, confirm } = useDialogStore();
 
   const openWindow = useWindowStore((s) => s.openWindow);
 
@@ -53,27 +56,29 @@ export default function FileManager() {
     setSelected(null);
   };
 
-  const handleNewFolder = async () => {
-    const name = prompt("Folder name:");
-    if (!name) return;
-    await kernel.mkdir(`${path}/${name}`);
-    refresh();
-  };
+const handleNewFolder = async () => {
+  const name = await prompt('New folder', 'Untitled folder')
+  if (!name) return
+  await kernel.mkdir(`${path}/${name}`)
+  refresh()
+}
 
-  const handleNewFile = async () => {
-    const name = prompt("File name (e.g. notes.txt):");
-    if (!name) return;
-    await kernel.writeFile(`${path}/${name}`, "");
-    refresh();
-  };
+const handleNewFile = async () => {
+  const name = await prompt('New file', 'untitled.txt')
+  if (!name) return
+  await kernel.writeFile(`${path}/${name}`, '')
+  refresh()
+}
 
-  const handleDelete = async () => {
-    if (!selected) return;
-    if (!confirm(`Delete "${selected.split("/").pop()}"?`)) return;
-    await kernel.deleteEntry(selected);
-    setSelected(null);
-    refresh();
-  };
+const handleDelete = async () => {
+  if (!selected) return
+  const filename = selected.split('/').pop()
+  const ok = await confirm('Delete file', `Are you sure you want to delete "${filename}"? This cannot be undone.`)
+  if (!ok) return
+  await kernel.deleteEntry(selected)
+  setSelected(null)
+  refresh()
+}
 
   const startRename = (entry: FsEntry) => {
     setRenaming(entry.path);

@@ -1,0 +1,100 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20000;
+}
+
+.dialog {
+  width: 320px;
+  background: rgba(26, 31, 46, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: pop 0.12s ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e6f0;
+  margin-bottom: 6px;
+}
+
+.message {
+  font-size: 12px;
+  color: #8090a8;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #e0e6f0;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+}
+
+.input:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btnSecondary,
+.btnPrimary,
+.btnDanger {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+
+.btnSecondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a0aec0;
+}
+
+.btnPrimary {
+  background: #6366f1;
+  color: white;
+}
+
+.btnDanger {
+  background: #ef4444;
+  color: white;
+}
+
+.btnSecondary:hover,
+.btnPrimary:hover,
+.btnDanger:hover {
+  filter: brightness(1.1);
+}
