@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import type { FsEntry } from "../../kernel/fs";
-import { readFile, writeFile, listDir } from "../../kernel/fs";
+import { kernel } from '../../kernel/kernelClient';
 import styles from "./TextEditor.module.css";
 
 interface Props {
@@ -16,7 +16,7 @@ export default function TextEditor({ initialPath }: Props) {
 
   // Load flat list of .txt files from /home/user for the file picker
   const loadFilePicker = useCallback(async () => {
-    const docs = await listDir("/home/user/documents");
+    const docs = await kernel.listDir("/home/user/documents");
     setFiles(docs.filter((e) => e.kind === "file"));
     setPicking(true);
   }, []);
@@ -28,7 +28,7 @@ export default function TextEditor({ initialPath }: Props) {
   }, [initialPath]);
 
   const openFile = async (path: string) => {
-    const text = await readFile(path);
+    const text = await kernel.readFile(path);
     setContent(text);
     setCurrentPath(path);
     setSaved(true);
@@ -40,10 +40,10 @@ export default function TextEditor({ initialPath }: Props) {
       const name = prompt("Save as (e.g. notes.txt):");
       if (!name) return;
       const path = `/home/user/documents/${name}`;
-      await writeFile(path, content);
+      await kernel.writeFile(path, content);
       setCurrentPath(path);
     } else {
-      await writeFile(currentPath, content);
+      await kernel.writeFile(currentPath, content);
     }
     setSaved(true);
   };

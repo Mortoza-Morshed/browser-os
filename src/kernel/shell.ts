@@ -1,4 +1,4 @@
-import * as fs from "./fs";
+import { kernel as fs } from "./kernelClient";
 
 export interface ShellContext {
   cwd: string; // current working directory

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { FsEntry } from "../../kernel/fs";
-import { listDir, mkdir, deleteEntry, writeFile } from "../../kernel/fs";
 import styles from "./FileManager.module.css";
+import { kernel } from "../../kernel/kernelClient";
 import { useWindowStore } from "../../store/windowStore";
 import { APP_REGISTRY } from "../../kernel/apps";
 
@@ -17,7 +17,7 @@ export default function FileManager() {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await listDir(path);
+      const list = await kernel.listDir(path);
       setEntries(list);
       setError(null);
     } catch (e) {
@@ -56,21 +56,21 @@ export default function FileManager() {
   const handleNewFolder = async () => {
     const name = prompt("Folder name:");
     if (!name) return;
-    await mkdir(`${path}/${name}`);
+    await kernel.mkdir(`${path}/${name}`);
     refresh();
   };
 
   const handleNewFile = async () => {
     const name = prompt("File name (e.g. notes.txt):");
     if (!name) return;
-    await writeFile(`${path}/${name}`, "");
+    await kernel.writeFile(`${path}/${name}`, "");
     refresh();
   };
 
   const handleDelete = async () => {
     if (!selected) return;
     if (!confirm(`Delete "${selected.split("/").pop()}"?`)) return;
-    await deleteEntry(selected);
+    await kernel.deleteEntry(selected);
     setSelected(null);
     refresh();
   };
@@ -89,8 +89,7 @@ export default function FileManager() {
     // For dirs, we can't easily rename — so just create new dir
     // Full rename support comes when we add move() in a later phase
     if (entry.kind === "file") {
-      const { rename } = await import("../../kernel/fs");
-      await rename(entry.path, newPath);
+      await kernel.rename(entry.path, newPath);
     }
     setRenaming(null);
     refresh();
