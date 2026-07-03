@@ -13,8 +13,14 @@ const MIN_W = 240;
 const MIN_H = 160;
 
 export default function Window({ window: win }: Props) {
-  const { focusWindow, closeWindow, moveWindow, resizeWindow, setWindowState, focusedId } =
-    useWindowStore();
+  const {
+    focusWindow,
+    closeWindow,
+    moveWindow,
+    resizeWindow,
+    setWindowState,
+    focusedId,
+  } = useWindowStore();
 
   const isFocused = focusedId === win.id;
   const app = getApp(win.appId);
@@ -86,7 +92,8 @@ export default function Window({ window: win }: Props) {
 
       const onMouseMove = (e: MouseEvent) => {
         if (!resizeState.current) return;
-        const { edge, startMouseX, startMouseY, startRect } = resizeState.current;
+        const { edge, startMouseX, startMouseY, startRect } =
+          resizeState.current;
         const dx = e.clientX - startMouseX;
         const dy = e.clientY - startMouseY;
 
@@ -147,6 +154,7 @@ export default function Window({ window: win }: Props) {
         zIndex: win.zIndex,
       }}
       onMouseDown={() => focusWindow(win.id)}
+      onContextMenu={(e) => e.stopPropagation()}
     >
       {/* Resize handles — one per edge and corner */}
       {(["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const).map((edge) => (
@@ -162,7 +170,10 @@ export default function Window({ window: win }: Props) {
         className={styles.titleBar}
         onMouseDown={onTitleBarMouseDown}
         onDoubleClick={() =>
-          setWindowState(win.id, win.state === "maximized" ? "normal" : "maximized")
+          setWindowState(
+            win.id,
+            win.state === "maximized" ? "normal" : "maximized",
+          )
         }
       >
         <span className={styles.titleText}>{win.title}</span>
@@ -180,7 +191,10 @@ export default function Window({ window: win }: Props) {
             className={`${styles.controlBtn} ${styles.maximizeBtn}`}
             onClick={(e) => {
               e.stopPropagation();
-              setWindowState(win.id, win.state === "maximized" ? "normal" : "maximized");
+              setWindowState(
+                win.id,
+                win.state === "maximized" ? "normal" : "maximized",
+              );
             }}
             title="Maximize"
           />

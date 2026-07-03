@@ -1,0 +1,47 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19000;
+}
+
+.menu {
+  position: fixed;
+  min-width: 180px;
+  background: rgba(26, 31, 46, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  z-index: 19001;
+  animation: pop 0.1s ease-out;
+}
+
+@keyframes pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: 6px 4px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: #c0c8d8;
+  font-size: 12.5px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.item:hover { background: rgba(255,255,255,0.08); }
+.item.danger { color: #fc8181; }
+.item.danger:hover { background: rgba(239,68,68,0.15); }

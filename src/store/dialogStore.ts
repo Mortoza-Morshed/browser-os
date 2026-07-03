@@ -8,7 +8,6 @@ interface DialogState {
   message?: string;
   defaultValue?: string;
   resolve: ((value: string | boolean | null) => void) | null;
-
   prompt: (title: string, defaultValue?: string) => Promise<string | null>;
   confirm: (title: string, message?: string) => Promise<boolean>;
   close: (value: string | boolean | null) => void;

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import type { FsEntry } from "../../kernel/fs";
-import styles from "./FileManager.module.css";
 import { kernel } from "../../kernel/kernelClient";
+import type { FsEntry } from "../../kernel/fs";
+import { useDialogStore } from "../../store/dialogStore";
+import { useContextMenuStore } from "../../store/contextMenuStore";
+import type { ContextMenuItem } from "../../store/contextMenuStore";
 import { useWindowStore } from "../../store/windowStore";
 import { APP_REGISTRY } from "../../kernel/apps";
-import { useDialogStore } from '../../store/dialogStore'
+import styles from "./FileManager.module.css";
 
 export default function FileManager() {
   const [path, setPath] = useState("/home/user");
@@ -15,7 +17,7 @@ export default function FileManager() {
   const [error, setError] = useState<string | null>(null);
 
   const { prompt, confirm } = useDialogStore();
-
+  const openContextMenu = useContextMenuStore((s) => s.open);
   const openWindow = useWindowStore((s) => s.openWindow);
 
   const refresh = useCallback(async () => {
@@ -23,7 +25,7 @@ export default function FileManager() {
       const list = await kernel.listDir(path);
       setEntries(list);
       setError(null);
-    } catch (e) {
+    } catch {
       setError("Could not read directory.");
     }
   }, [path]);
@@ -32,20 +34,22 @@ export default function FileManager() {
     refresh();
   }, [refresh]);
 
+  // ── Core actions — each one is a plain function, no menu logic here ──
+
   const navigate = (entry: FsEntry) => {
     if (entry.kind === "directory") {
       setPath(entry.path);
       setSelected(null);
-    } else {
-      // Open file in Text Editor
-      const editorApp = APP_REGISTRY.find((a) => a.id === "text-editor")!;
-      openWindow({
-        appId: editorApp.id,
-        title: entry.name,
-        defaultSize: editorApp.defaultSize,
-        initialProps: { initialPath: entry.path },
-      });
+      return;
     }
+    const editorApp = APP_REGISTRY.find((a) => a.id === "text-editor");
+    if (!editorApp) return;
+    openWindow({
+      appId: editorApp.id,
+      title: entry.name,
+      defaultSize: editorApp.defaultSize,
+      initialProps: { initialPath: entry.path },
+    });
   };
 
   const goUp = () => {
@@ -56,88 +60,149 @@ export default function FileManager() {
     setSelected(null);
   };
 
-const handleNewFolder = async () => {
-  const name = await prompt('New folder', 'Untitled folder')
-  if (!name) return
-  await kernel.mkdir(`${path}/${name}`)
-  refresh()
-}
+  const handleNewFolder = async () => {
+    const name = await prompt("New folder", "Untitled folder");
+    if (!name) return;
+    await kernel.mkdir(`${path}/${name}`);
+    refresh();
+  };
 
-const handleNewFile = async () => {
-  const name = await prompt('New file', 'untitled.txt')
-  if (!name) return
-  await kernel.writeFile(`${path}/${name}`, '')
-  refresh()
-}
-
-const handleDelete = async () => {
-  if (!selected) return
-  const filename = selected.split('/').pop()
-  const ok = await confirm('Delete file', `Are you sure you want to delete "${filename}"? This cannot be undone.`)
-  if (!ok) return
-  await kernel.deleteEntry(selected)
-  setSelected(null)
-  refresh()
-}
+  const handleNewFile = async () => {
+    const name = await prompt("New file", "untitled.txt");
+    if (!name) return;
+    await kernel.writeFile(`${path}/${name}`, "");
+    refresh();
+  };
 
   const startRename = (entry: FsEntry) => {
+    setSelected(entry.path);
     setRenaming(entry.path);
     setRenameValue(entry.name);
   };
 
   const commitRename = async (entry: FsEntry) => {
-    if (!renameValue || renameValue === entry.name) {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === entry.name || entry.kind === "directory") {
       setRenaming(null);
       return;
     }
-    const newPath = `${path}/${renameValue}`;
-    // For dirs, we can't easily rename — so just create new dir
-    // Full rename support comes when we add move() in a later phase
-    if (entry.kind === "file") {
+    const newPath = `${path}/${trimmed}`;
+    try {
       await kernel.rename(entry.path, newPath);
+    } catch (err) {
+      console.error("Rename failed:", err);
     }
     setRenaming(null);
     refresh();
   };
 
+  const deleteEntry = async (entry: FsEntry) => {
+    const ok = await confirm(
+      "Delete file",
+      `Are you sure you want to delete "${entry.name}"? This cannot be undone.`,
+    );
+    if (!ok) return;
+    await kernel.deleteEntry(entry.path);
+    if (selected === entry.path) setSelected(null);
+    refresh();
+  };
+
+  // ── Menu builders — pure functions, data in, data out ──────────
+  // These never touch events or the DOM. You can test one in isolation
+  // by calling buildEntryMenu(someEntry) and logging the result.
+
+  const buildEntryMenu = (entry: FsEntry): ContextMenuItem[] => {
+    const items: ContextMenuItem[] = [
+      {
+        label: entry.kind === "directory" ? "Open" : "Open in editor",
+        onClick: () => navigate(entry),
+      },
+    ];
+
+    if (entry.kind === "file") {
+      items.push({
+        label: "Rename",
+        onClick: () => startRename(entry),
+      });
+    }
+
+    items.push({
+      label: "Delete",
+      danger: true,
+      divider: true,
+      onClick: () => deleteEntry(entry),
+    });
+
+    return items;
+  };
+
+  const buildEmptySpaceMenu = (): ContextMenuItem[] => [
+    { label: "New folder", onClick: handleNewFolder },
+    { label: "New file", onClick: handleNewFile },
+  ];
+
+  // ── Event handlers — thin, single-purpose, unconditional stopPropagation ──
+
+  const handleEntryContextMenu = (e: React.MouseEvent, entry: FsEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelected(entry.path);
+    openContextMenu(e.clientX, e.clientY, buildEntryMenu(entry));
+  };
+
+  const handleEmptySpaceContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenu(e.clientX, e.clientY, buildEmptySpaceMenu());
+  };
+
   return (
     <div className={styles.container}>
-      {/* Toolbar */}
       <div className={styles.toolbar}>
         <button className={styles.toolBtn} onClick={goUp} title="Go up">
           ↑
         </button>
         <span className={styles.pathBar}>{path}</span>
-        <button className={styles.toolBtn} onClick={handleNewFolder} title="New folder">
+        <button className={styles.toolBtn} onClick={handleNewFolder}>
           + Folder
         </button>
-        <button className={styles.toolBtn} onClick={handleNewFile} title="New file">
+        <button className={styles.toolBtn} onClick={handleNewFile}>
           + File
         </button>
         {selected && (
           <button
             className={styles.toolBtn}
-            onClick={handleDelete}
-            title="Delete"
             style={{ color: "#fc8181" }}
+            onClick={() => {
+              const entry = entries.find((en) => en.path === selected);
+              if (entry) deleteEntry(entry);
+            }}
           >
             Delete
           </button>
         )}
       </div>
 
-      {/* File list */}
-      <div className={styles.fileList}>
+      <div
+        className={styles.fileList}
+        onContextMenu={handleEmptySpaceContextMenu}
+      >
         {error && <div className={styles.error}>{error}</div>}
-        {entries.length === 0 && !error && <div className={styles.empty}>Empty folder</div>}
+        {entries.length === 0 && !error && (
+          <div className={styles.empty}>Empty folder</div>
+        )}
+
         {entries.map((entry) => (
           <div
             key={entry.path}
             className={`${styles.entry} ${selected === entry.path ? styles.selected : ""}`}
             onClick={() => setSelected(entry.path)}
             onDoubleClick={() => navigate(entry)}
+            onContextMenu={(e) => handleEntryContextMenu(e, entry)}
           >
-            <span className={styles.entryIcon}>{entry.kind === "directory" ? "📁" : "📄"}</span>
+            <span className={styles.entryIcon}>
+              {entry.kind === "directory" ? "📁" : "📄"}
+            </span>
 
             {renaming === entry.path ? (
               <input
@@ -153,17 +218,7 @@ const handleDelete = async () => {
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span
-                className={styles.entryName}
-                onDoubleClick={(e) => {
-                  if (entry.kind === "file") {
-                    e.stopPropagation();
-                    startRename(entry);
-                  }
-                }}
-              >
-                {entry.name}
-              </span>
+              <span className={styles.entryName}>{entry.name}</span>
             )}
           </div>
         ))}
