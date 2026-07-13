@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { OsWindow, WindowId, WindowRect, WindowState, AppId } from "../kernel/types.ts";
+import type {
+  OsWindow,
+  WindowId,
+  WindowRect,
+  WindowState,
+  AppId,
+} from "../kernel/types.ts";
+
+export type SnapZone = "left" | "right" | "top" | null;
 
 let nextId = 1;
 const genId = (): WindowId => `win-${nextId++}`;
@@ -12,6 +20,7 @@ let zCounter = 10;
 interface WindowStore {
   windows: OsWindow[];
   focusedId: WindowId | null;
+  previewZone: SnapZone;
 
   openWindow: (params: {
     appId: AppId;
@@ -25,12 +34,57 @@ interface WindowStore {
   moveWindow: (id: WindowId, x: number, y: number) => void;
   resizeWindow: (id: WindowId, rect: Partial<WindowRect>) => void;
   setWindowState: (id: WindowId, state: WindowState) => void;
+
+  setPreviewZone: (zone: SnapZone) => void;
+  snapWindow: (id: WindowId, zone: SnapZone) => void;
+  getSnapRect: (zone: SnapZone) => WindowRect;
 }
 
 export const useWindowStore = create<WindowStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     windows: [],
     focusedId: null,
+    previewZone: null,
+
+    setPreviewZone: (zone) =>
+      set((s) => {
+        s.previewZone = zone;
+      }),
+
+    getSnapRect: (zone): WindowRect => {
+      const taskbarHeight = 44;
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight - taskbarHeight;
+
+      if (zone === "top") {
+        return { x: 0, y: 0, width: screenW, height: screenH };
+      }
+      if (zone === "left") {
+        return { x: 0, y: 0, width: screenW / 2, height: screenH };
+      }
+      if (zone === "right") {
+        return { x: screenW / 2, y: 0, width: screenW / 2, height: screenH };
+      }
+      // Should never be called with null, but return something sane
+      return { x: 0, y: 0, width: screenW, height: screenH };
+    },
+
+    snapWindow: (id, zone) =>
+      set((s) => {
+        const win = s.windows.find((w) => w.id === id);
+        if (!win || !zone) return;
+
+        // Save current geometry so we can restore it if the window
+        // is later dragged away from the snapped edge
+        if (win.state !== "maximized") {
+          win.prevRect = { ...win.rect };
+        }
+
+        const snapRect = get().getSnapRect(zone);
+        win.rect = snapRect;
+        win.state = zone === "top" ? "maximized" : "normal";
+        s.previewZone = null;
+      }),
 
     openWindow: ({ appId, title, defaultSize, initialProps }) =>
       set((s) => {

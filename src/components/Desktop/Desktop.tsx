@@ -7,6 +7,7 @@ import Taskbar from "../Taskbar/Taskbar";
 import DialogHost from "../DialogHost/DialogHost";
 import ContextMenu from "../ContextMenu/ContextMenu";
 import styles from "./Desktop.module.css";
+import SnapPreview from "../SnapPreview/SnapPreview";
 
 const DESKTOP_PATH = "/home/user/desktop";
 
@@ -42,6 +43,7 @@ export default function Desktop() {
       {windows.map((win) => (
         <Window key={win.id} window={win} />
       ))}
+      <SnapPreview />
       <Taskbar />
       <DialogHost />
       <ContextMenu />

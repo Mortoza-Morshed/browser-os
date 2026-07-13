@@ -1,0 +1,15 @@
+.preview {
+  position: absolute;
+  background: rgba(99, 102, 241, 0.18);
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 8000;
+  animation: fadeIn 0.1s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

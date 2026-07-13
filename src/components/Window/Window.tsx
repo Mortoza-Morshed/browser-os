@@ -1,6 +1,6 @@
 import { useRef, useCallback } from "react";
 import type { OsWindow } from "../../kernel/types";
-import { useWindowStore } from "../../store/windowStore";
+import { useWindowStore, type SnapZone } from "../../store/windowStore";
 import { getApp } from "../../kernel/apps";
 import styles from "./Window.module.css";
 
@@ -11,6 +11,7 @@ interface Props {
 // const TASKBAR_HEIGHT = 44
 const MIN_W = 240;
 const MIN_H = 160;
+const EDGE_THRESHOLD = 24;
 
 export default function Window({ window: win }: Props) {
   const {
@@ -20,6 +21,8 @@ export default function Window({ window: win }: Props) {
     resizeWindow,
     setWindowState,
     focusedId,
+    setPreviewZone,
+    snapWindow,
   } = useWindowStore();
 
   const isFocused = focusedId === win.id;
@@ -41,6 +44,7 @@ export default function Window({ window: win }: Props) {
   } | null>(null);
 
   // ── Drag (title bar) ──────────────────────────────────────────────
+
   const onTitleBarMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (win.state === "maximized") return;
@@ -61,10 +65,33 @@ export default function Window({ window: win }: Props) {
         const newX = dragState.current.startWinX + dx;
         const newY = Math.max(0, dragState.current.startWinY + dy);
         moveWindow(win.id, newX, newY);
+
+        // ── Snap zone proximity detection — based on the WINDOW's edges,
+        // not the cursor's raw position ──────────────────────────────
+        const screenW = window.innerWidth;
+        const winRight = newX + win.rect.width;
+        let zone: SnapZone = null;
+
+        if (newY <= EDGE_THRESHOLD) {
+          zone = "top";
+        } else if (newX <= EDGE_THRESHOLD) {
+          zone = "left";
+        } else if (winRight >= screenW - EDGE_THRESHOLD) {
+          zone = "right";
+        }
+
+        setPreviewZone(zone);
       };
 
       const onMouseUp = () => {
         dragState.current = null;
+
+        const currentPreview = useWindowStore.getState().previewZone;
+        if (currentPreview) {
+          snapWindow(win.id, currentPreview);
+        }
+        setPreviewZone(null);
+
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };
@@ -72,7 +99,7 @@ export default function Window({ window: win }: Props) {
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     },
-    [win, focusWindow, moveWindow],
+    [win, focusWindow, moveWindow, setPreviewZone, snapWindow],
   );
 
   // ── Resize (edge handles) ─────────────────────────────────────────
