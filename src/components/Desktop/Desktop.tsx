@@ -8,6 +8,8 @@ import DialogHost from "../DialogHost/DialogHost";
 import ContextMenu from "../ContextMenu/ContextMenu";
 import styles from "./Desktop.module.css";
 import SnapPreview from "../SnapPreview/SnapPreview";
+import { useEffect } from "react";
+import { handleGlobalKeyDown } from "../../kernel/shortcuts";
 
 const DESKTOP_PATH = "/home/user/desktop";
 
@@ -15,6 +17,12 @@ export default function Desktop() {
   const windows = useWindowStore((s) => s.windows);
   const openContextMenu = useContextMenuStore((s) => s.open);
   const { prompt } = useDialogStore();
+
+  
+  useEffect(() => {
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const handleDesktopContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();

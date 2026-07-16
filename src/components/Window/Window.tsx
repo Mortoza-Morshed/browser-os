@@ -8,7 +8,6 @@ interface Props {
   window: OsWindow;
 }
 
-// const TASKBAR_HEIGHT = 44
 const MIN_W = 240;
 const MIN_H = 160;
 const EDGE_THRESHOLD = 24;

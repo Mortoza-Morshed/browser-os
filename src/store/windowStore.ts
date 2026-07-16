@@ -34,10 +34,10 @@ interface WindowStore {
   moveWindow: (id: WindowId, x: number, y: number) => void;
   resizeWindow: (id: WindowId, rect: Partial<WindowRect>) => void;
   setWindowState: (id: WindowId, state: WindowState) => void;
-
   setPreviewZone: (zone: SnapZone) => void;
   snapWindow: (id: WindowId, zone: SnapZone) => void;
   getSnapRect: (zone: SnapZone) => WindowRect;
+  cycleFocus: () => void;
 }
 
 export const useWindowStore = create<WindowStore>()(
@@ -45,7 +45,6 @@ export const useWindowStore = create<WindowStore>()(
     windows: [],
     focusedId: null,
     previewZone: null,
-
     setPreviewZone: (zone) =>
       set((s) => {
         s.previewZone = zone;
@@ -159,6 +158,25 @@ export const useWindowStore = create<WindowStore>()(
           win.prevRect = null;
         }
         win.state = state;
+      }),
+    cycleFocus: () =>
+      set((s) => {
+        if (s.windows.length === 0) return;
+
+        // Sort by zIndex ascending so we know the current stack order
+        const sorted = [...s.windows].sort((a, b) => a.zIndex - b.zIndex);
+        const currentIdx = sorted.findIndex((w) => w.id === s.focusedId);
+
+        // Next window in the stack, wrapping around to the bottom
+        const nextIdx = (currentIdx + 1) % sorted.length;
+        const next = sorted[nextIdx];
+
+        // Restore if minimized, then focus (which also bumps zIndex to top)
+        if (next.state === "minimized") {
+          next.state = "normal";
+        }
+        next.zIndex = ++zCounter;
+        s.focusedId = next.id;
       }),
   })),
 );
