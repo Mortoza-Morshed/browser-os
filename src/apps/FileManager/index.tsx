@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { kernel } from "../../kernel/kernelClient";
+import { kernel, onFsMutation } from "../../kernel/kernelClient";
+import { isValidEntryName, isWithinDir } from "../../kernel/paths";
 import type { FsEntry } from "../../kernel/fs";
 import { useDialogStore } from "../../store/dialogStore";
 import { useContextMenuStore } from "../../store/contextMenuStore";
@@ -17,7 +18,7 @@ export default function FileManager() {
   const [renameValue, setRenameValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { prompt, confirm } = useDialogStore();
+  const { prompt, confirm, alert } = useDialogStore();
   const openContextMenu = useContextMenuStore((s) => s.open);
   const openWindow = useWindowStore((s) => s.openWindow);
 
@@ -35,6 +36,20 @@ export default function FileManager() {
     const timer = window.setTimeout(() => void refresh(), 0);
     return () => window.clearTimeout(timer);
   }, [refresh]);
+
+  // Rescan when anything else (terminal, other windows) changes the
+  // directory currently being viewed.
+  useEffect(
+    () =>
+      onFsMutation((mutation) => {
+        const touches =
+          isWithinDir(mutation.path, path) ||
+          (mutation.previousPath !== undefined &&
+            isWithinDir(mutation.previousPath, path));
+        if (touches) refresh();
+      }),
+    [path, refresh],
+  );
 
   // ── Core actions — each one is a plain function, no menu logic here ──
 
@@ -63,16 +78,32 @@ export default function FileManager() {
   };
 
   const handleNewFolder = async () => {
-    const name = await prompt("New folder", "Untitled folder");
+    const name = (await prompt("New folder", "Untitled folder"))?.trim();
     if (!name) return;
-    await kernel.mkdir(`${path}/${name}`);
+    if (!isValidEntryName(name)) {
+      await alert("Invalid name", `"${name}" cannot be used as a name.`);
+      return;
+    }
+    try {
+      await kernel.mkdir(`${path}/${name}`);
+    } catch (err) {
+      await alert("Could not create folder", (err as Error).message);
+    }
     refresh();
   };
 
   const handleNewFile = async () => {
-    const name = await prompt("New file", "untitled.txt");
+    const name = (await prompt("New file", "untitled.txt"))?.trim();
     if (!name) return;
-    await kernel.writeFile(`${path}/${name}`, "");
+    if (!isValidEntryName(name)) {
+      await alert("Invalid name", `"${name}" cannot be used as a name.`);
+      return;
+    }
+    try {
+      await kernel.writeFile(`${path}/${name}`, "");
+    } catch (err) {
+      await alert("Could not create file", (err as Error).message);
+    }
     refresh();
   };
 
@@ -88,11 +119,17 @@ export default function FileManager() {
       setRenaming(null);
       return;
     }
+    if (!isValidEntryName(trimmed)) {
+      setRenaming(null);
+      await alert("Invalid name", `"${trimmed}" cannot be used as a name.`);
+      return;
+    }
     const newPath = `${path}/${trimmed}`;
     try {
       await kernel.rename(entry.path, newPath);
     } catch (err) {
       console.error("Rename failed:", err);
+      await alert("Rename failed", (err as Error).message);
     }
     setRenaming(null);
     refresh();

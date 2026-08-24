@@ -29,6 +29,45 @@ export async function saveLayout(layout: DesktopLayout): Promise<void> {
   await kernel.writeFile(LAYOUT_PATH, JSON.stringify(layout, null, 2));
 }
 
+// Removes layout slots for entries that no longer exist on the
+// desktop so deleted icons stop reserving grid cells.
+export function pruneLayout(
+  layout: DesktopLayout,
+  presentNames: readonly string[],
+): { layout: DesktopLayout; changed: boolean } {
+  const present = new Set(presentNames)
+  const result: DesktopLayout = {}
+  let changed = false
+
+  for (const [name, pos] of Object.entries(layout)) {
+    if (!present.has(name)) {
+      changed = true
+      continue
+    }
+    result[name] = pos
+  }
+
+  return { layout: result, changed }
+}
+
+// Moves an icon's saved slot when its file is renamed. A stale slot
+// under the new name is overwritten by the moved entry. Returns a
+// copy; `changed` is false when there was nothing to do.
+export function renameLayoutEntry(
+  layout: DesktopLayout,
+  fromName: string,
+  toName: string,
+): { layout: DesktopLayout; changed: boolean } {
+  const pos = layout[fromName]
+  if (!pos) return { layout: { ...layout }, changed: false }
+
+  const result: DesktopLayout = { ...layout }
+  delete result[fromName]
+  result[toName] = pos
+
+  return { layout: result, changed: fromName !== toName }
+}
+
 // ── Grid geometry helpers ─────────────────────────────────────────
 
 export function getGridDimensions(viewportW: number, viewportH: number) {

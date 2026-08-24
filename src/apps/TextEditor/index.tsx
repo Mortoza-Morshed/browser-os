@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { FsEntry } from "../../kernel/fs";
 import { kernel } from "../../kernel/kernelClient";
+import { isValidEntryName } from "../../kernel/paths";
 import styles from "./TextEditor.module.css";
 import { useDialogStore } from "../../store/dialogStore";
 
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function TextEditor({ initialPath }: Props) {
-  const { prompt } = useDialogStore();
+  const { prompt, alert } = useDialogStore();
   const [currentPath, setCurrentPath] = useState<string | null>(
     initialPath ?? null,
   );
@@ -41,8 +42,12 @@ export default function TextEditor({ initialPath }: Props) {
 
   const save = async () => {
     if (!currentPath) {
-      const name = await prompt("Save file", "notes.txt");
+      const name = (await prompt("Save file", "notes.txt"))?.trim();
       if (!name) return;
+      if (!isValidEntryName(name)) {
+        await alert("Invalid name", `"${name}" cannot be used as a name.`);
+        return;
+      }
       const path = `/home/user/documents/${name}`;
       await kernel.writeFile(path, content);
       setCurrentPath(path);

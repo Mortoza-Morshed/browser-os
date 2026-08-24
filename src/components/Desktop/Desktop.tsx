@@ -1,8 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWindowStore } from "../../store/windowStore";
 import { useContextMenuStore } from "../../store/contextMenuStore";
 import { useDialogStore } from "../../store/dialogStore";
-import { kernel } from "../../kernel/kernelClient";
+import { kernel, onFsMutation } from "../../kernel/kernelClient";
+import {
+  isValidEntryName,
+  baseNameOf,
+  parentPathOf,
+  isWithinDir,
+} from "../../kernel/paths";
 import type { FsEntry } from "../../kernel/fs";
 import { buildEntryMenu } from "../../kernel/entryMenu";
 import {
@@ -11,6 +17,8 @@ import {
   findNextSlot,
   snapToGrid,
   migrateLayoutToGrid,
+  pruneLayout,
+  renameLayoutEntry,
   type DesktopLayout,
 } from "../../kernel/desktopLayout";
 import { APP_REGISTRY } from "../../kernel/apps";
@@ -25,11 +33,23 @@ import styles from "./Desktop.module.css";
 
 const DESKTOP_PATH = "/home/user/desktop";
 
+// Keep the persisted icon layout in sync when a desktop entry is
+// renamed from any surface (FileManager, terminal) — otherwise the
+// renamed file would land in a fresh slot and orphan the old one.
+async function syncLayoutRename(
+  fromName: string,
+  toName: string,
+): Promise<void> {
+  const layout = await loadLayout();
+  const { layout: next, changed } = renameLayoutEntry(layout, fromName, toName);
+  if (changed) await saveLayout(next);
+}
+
 export default function Desktop() {
   const windows = useWindowStore((s) => s.windows);
   const openWindow = useWindowStore((s) => s.openWindow);
   const openContextMenu = useContextMenuStore((s) => s.open);
-  const { prompt, confirm } = useDialogStore();
+  const { prompt, confirm, alert } = useDialogStore();
 
   const [icons, setIcons] = useState<FsEntry[]>([]);
   const [layout, setLayout] = useState<DesktopLayout>({});
@@ -48,6 +68,14 @@ export default function Desktop() {
     );
     currentLayout = migrated.layout;
     let changed = migrated.changed;
+
+    // Drop slots for entries that no longer exist
+    const pruned = pruneLayout(
+      currentLayout,
+      entries.map((entry) => entry.name),
+    );
+    currentLayout = pruned.layout;
+    changed = changed || pruned.changed;
 
     for (const entry of entries) {
       if (!currentLayout[entry.name]) {
@@ -72,6 +100,41 @@ export default function Desktop() {
     const timer = window.setTimeout(() => void refreshIcons(), 0);
     return () => window.clearTimeout(timer);
   }, [refreshIcons]);
+
+  // Rescan whenever any surface (terminal, other windows) mutates
+  // the filesystem in a way that could affect the desktop. Events
+  // are processed strictly one at a time through a promise chain:
+  // layout-rename sync must finish before the follow-up rescan
+  // reads/writes, and rapid bursts can't interleave partial work.
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  useEffect(
+    () =>
+      onFsMutation((mutation) => {
+        const process = async () => {
+          if (
+            mutation.type === "rename" &&
+            mutation.previousPath &&
+            parentPathOf(mutation.previousPath) === DESKTOP_PATH &&
+            parentPathOf(mutation.path) === DESKTOP_PATH
+          ) {
+            await syncLayoutRename(
+              baseNameOf(mutation.previousPath),
+              baseNameOf(mutation.path),
+            );
+          }
+
+          const touchesDesktop =
+            isWithinDir(mutation.path, DESKTOP_PATH) ||
+            (mutation.previousPath !== undefined &&
+              isWithinDir(mutation.previousPath, DESKTOP_PATH));
+          if (touchesDesktop) await refreshIcons();
+        };
+        mutationQueue.current = mutationQueue.current
+          .then(process)
+          .catch(() => {});
+      }),
+    [refreshIcons],
+  );
 
   useEffect(() => {
     document.addEventListener("keydown", handleGlobalKeyDown);
@@ -98,21 +161,21 @@ export default function Desktop() {
     droppedX: number,
     droppedY: number,
   ) => {
-    let nextLayout: DesktopLayout = {};
-    setLayout((prevLayout) => {
-      const snapped = snapToGrid(
-        droppedX,
-        droppedY,
-        prevLayout,
-        entry.name,
-        window.innerWidth,
-        window.innerHeight,
-      );
-      nextLayout = { ...prevLayout, [entry.name]: snapped };
-      return nextLayout;
-    });
-
-    saveLayout(nextLayout);
+    // Compute from the current layout state directly — never capture
+    // values from inside a setLayout updater, which React runs
+    // lazily (and possibly more than once). Writing a stale/empty
+    // layout here would wipe every saved icon position.
+    const snapped = snapToGrid(
+      droppedX,
+      droppedY,
+      layout,
+      entry.name,
+      window.innerWidth,
+      window.innerHeight,
+    );
+    const nextLayout: DesktopLayout = { ...layout, [entry.name]: snapped };
+    setLayout(nextLayout);
+    void saveLayout(nextLayout);
   };
 
   const handleIconContextMenu = (e: React.MouseEvent, entry: FsEntry) => {
@@ -138,18 +201,34 @@ export default function Desktop() {
       {
         label: "New folder",
         onClick: async () => {
-          const name = await prompt("New folder", "Untitled folder");
+          const name = (await prompt("New folder", "Untitled folder"))?.trim();
           if (!name) return;
-          await kernel.mkdir(`${DESKTOP_PATH}/${name}`);
+          if (!isValidEntryName(name)) {
+            await alert("Invalid name", `"${name}" cannot be used as a name.`);
+            return;
+          }
+          try {
+            await kernel.mkdir(`${DESKTOP_PATH}/${name}`);
+          } catch (err) {
+            await alert("Could not create folder", (err as Error).message);
+          }
           refreshIcons();
         },
       },
       {
         label: "New file",
         onClick: async () => {
-          const name = await prompt("New file", "untitled.txt");
+          const name = (await prompt("New file", "untitled.txt"))?.trim();
           if (!name) return;
-          await kernel.writeFile(`${DESKTOP_PATH}/${name}`, "");
+          if (!isValidEntryName(name)) {
+            await alert("Invalid name", `"${name}" cannot be used as a name.`);
+            return;
+          }
+          try {
+            await kernel.writeFile(`${DESKTOP_PATH}/${name}`, "");
+          } catch (err) {
+            await alert("Could not create file", (err as Error).message);
+          }
           refreshIcons();
         },
       },

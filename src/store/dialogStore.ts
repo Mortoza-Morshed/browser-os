@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type DialogKind = "prompt" | "confirm" | null;
+type DialogKind = "prompt" | "confirm" | "alert" | null;
 
 interface DialogState {
   kind: DialogKind;
@@ -10,6 +10,7 @@ interface DialogState {
   resolve: ((value: string | boolean | null) => void) | null;
   prompt: (title: string, defaultValue?: string) => Promise<string | null>;
   confirm: (title: string, message?: string) => Promise<boolean>;
+  alert: (title: string, message?: string) => Promise<void>;
   close: (value: string | boolean | null) => void;
 }
 
@@ -37,6 +38,16 @@ export const useDialogStore = create<DialogState>((set, get) => ({
         title,
         message,
         resolve: (value) => resolve(typeof value === "boolean" ? value : false),
+      });
+    }),
+
+  alert: (title, message) =>
+    new Promise<void>((resolve) => {
+      set({
+        kind: "alert",
+        title,
+        message,
+        resolve: () => resolve(),
       });
     }),
 

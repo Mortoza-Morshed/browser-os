@@ -10,7 +10,7 @@ export default function DialogHost() {
   return (
     <div
       className={styles.backdrop}
-      onMouseDown={() => close(kind === "prompt" ? null : false)}
+      onMouseDown={() => close(kind === "confirm" ? false : null)}
     >
       <div className={styles.dialog} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.title}>{title}</div>
@@ -31,6 +31,14 @@ export default function DialogHost() {
             </button>
             <button className={styles.btnDanger} onClick={() => close(true)}>
               Confirm
+            </button>
+          </div>
+        )}
+
+        {kind === "alert" && (
+          <div className={styles.actions}>
+            <button className={styles.btnPrimary} onClick={() => close(null)}>
+              OK
             </button>
           </div>
         )}

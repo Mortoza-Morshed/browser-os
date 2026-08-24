@@ -151,8 +151,8 @@ export function createShell() {
       const dest = resolvePath(args[1]);
       try {
         await fs.rename(src, dest);
-      } catch {
-        out(`mv: cannot move '${args[0]}' to '${args[1]}'`);
+      } catch (err) {
+        out(`mv: ${(err as Error).message}`);
       }
     },
 

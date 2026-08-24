@@ -1,4 +1,10 @@
 // src/kernel/fs.ts
+import {
+  assertValidLeafName,
+  baseNameOf,
+  joinPath,
+  parentPathOf,
+} from "./paths";
 
 export interface FsEntry {
   name: string
@@ -6,7 +12,8 @@ export interface FsEntry {
   path: string
 }
 
-// ── Internal helper ───────────────────────────────────────────────
+// ── Internal helpers ──────────────────────────────────────────────
+
 // Walks a path like "/home/user/documents" and returns the
 // FileSystemDirectoryHandle at that location.
 async function resolvePath(
@@ -23,17 +30,48 @@ async function resolvePath(
   return current
 }
 
-// Same but resolves to a FILE handle, splitting the path into
-// parent directory + filename.
+// Same but resolves to a FILE handle's parent directory + filename.
 async function resolveFilePath(
   path: string,
   create = false
 ): Promise<{ dir: FileSystemDirectoryHandle; name: string }> {
-  const parts = path.split('/').filter(Boolean)
-  const name = parts.pop()!
-  const dirPath = '/' + parts.join('/')
-  const dir = await resolvePath(dirPath, create)
-  return { dir, name }
+  const dir = await resolvePath(parentPathOf(path), create)
+  return { dir, name: baseNameOf(path) }
+}
+
+// Returns what lives at `path`, or null when nothing does —
+// including the case where a parent directory is missing.
+async function entryKind(path: string): Promise<'file' | 'directory' | null> {
+  let dir: FileSystemDirectoryHandle
+  let name: string
+  try {
+    ({ dir, name } = await resolveFilePath(path))
+  } catch {
+    return null
+  }
+  try {
+    await dir.getFileHandle(name)
+    return 'file'
+  } catch {
+    try {
+      await dir.getDirectoryHandle(name)
+      return 'directory'
+    } catch {
+      return null
+    }
+  }
+}
+
+async function copyDirectory(src: string, dest: string): Promise<void> {
+  await mkdir(dest)
+  for (const entry of await listDir(src)) {
+    if (entry.kind === 'directory') {
+      await copyDirectory(entry.path, joinPath(dest, entry.name))
+    } else {
+      const content = await readFile(entry.path)
+      await writeFile(joinPath(dest, entry.name), content)
+    }
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────
@@ -63,6 +101,7 @@ export async function readFile(path: string): Promise<string> {
 }
 
 export async function writeFile(path: string, content: string): Promise<void> {
+  assertValidLeafName(path)
   const { dir, name } = await resolveFilePath(path, true)
   const fileHandle = await dir.getFileHandle(name, { create: true })
   const writable = await fileHandle.createWritable()
@@ -71,42 +110,55 @@ export async function writeFile(path: string, content: string): Promise<void> {
 }
 
 export async function mkdir(path: string): Promise<void> {
+  assertValidLeafName(path)
   await resolvePath(path, true)
 }
 
 export async function deleteEntry(path: string): Promise<void> {
-  const parts = path.split('/').filter(Boolean)
-  const name = parts.pop()!
-  const parentPath = '/' + parts.join('/')
-  const parent = await resolvePath(parentPath)
-  await parent.removeEntry(name, { recursive: true })
+  assertValidLeafName(path)
+  const parent = await resolvePath(parentPathOf(path))
+  await parent.removeEntry(baseNameOf(path), { recursive: true })
 }
 
+// OPFS has no native rename, so rename/move is copy-then-delete.
+// Guarantees:
+//  - fails if the destination already exists (never overwrites)
+//  - supports directories via full recursive copy
+//  - source is deleted only after the copy fully succeeded, so a
+//    failure mid-copy leaves the original untouched
 export async function rename(oldPath: string, newPath: string): Promise<void> {
-  // OPFS doesn't have a native rename, so we copy then delete
-  const content = await readFile(oldPath)
-  await writeFile(newPath, content)
-  await deleteEntry(oldPath)
+  assertValidLeafName(newPath)
+
+  const src = oldPath.replace(/\/+$/, '') || '/'
+  const dst = newPath.replace(/\/+$/, '') || '/'
+
+  if (src === dst) {
+    throw new Error(`rename: source and destination are the same: ${oldPath}`)
+  }
+  // Refuse to move a directory into its own subtree — the recursive
+  // copy would never terminate.
+  if (dst.startsWith(src === '/' ? '/' : src + '/')) {
+    throw new Error(`rename: cannot move "${oldPath}" into itself`)
+  }
+
+  const kind = await entryKind(src)
+  if (!kind) {
+    throw new Error(`rename: source does not exist: ${oldPath}`)
+  }
+  if ((await entryKind(dst)) !== null) {
+    throw new Error(`rename: destination already exists: ${newPath}`)
+  }
+
+  if (kind === 'file') {
+    const content = await readFile(src)
+    await writeFile(dst, content)
+  } else {
+    await copyDirectory(src, dst)
+  }
+
+  await deleteEntry(src)
 }
 
 export async function exists(path: string): Promise<boolean> {
-  try {
-    const parts = path.split('/').filter(Boolean)
-    const name = parts.pop()!
-    const parentPath = '/' + parts.join('/')
-    const parent = await resolvePath(parentPath)
-    await parent.getFileHandle(name)
-    return true
-  } catch {
-    try {
-      const parts = path.split('/').filter(Boolean)
-      const name = parts.pop()!
-      const parentPath = '/' + parts.join('/')
-      const parent = await resolvePath(parentPath)
-      await parent.getDirectoryHandle(name)
-      return true
-    } catch {
-      return false
-    }
-  }
+  return (await entryKind(path)) !== null
 }
