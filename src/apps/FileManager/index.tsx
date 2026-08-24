@@ -6,6 +6,7 @@ import { useContextMenuStore } from "../../store/contextMenuStore";
 import type { ContextMenuItem } from "../../store/contextMenuStore";
 import { useWindowStore } from "../../store/windowStore";
 import { APP_REGISTRY } from "../../kernel/apps";
+import { buildEntryMenu } from "../../kernel/entryMenu";
 import styles from "./FileManager.module.css";
 
 export default function FileManager() {
@@ -111,31 +112,6 @@ export default function FileManager() {
   // These never touch events or the DOM. You can test one in isolation
   // by calling buildEntryMenu(someEntry) and logging the result.
 
-  const buildEntryMenu = (entry: FsEntry): ContextMenuItem[] => {
-    const items: ContextMenuItem[] = [
-      {
-        label: entry.kind === "directory" ? "Open" : "Open in editor",
-        onClick: () => navigate(entry),
-      },
-    ];
-
-    if (entry.kind === "file") {
-      items.push({
-        label: "Rename",
-        onClick: () => startRename(entry),
-      });
-    }
-
-    items.push({
-      label: "Delete",
-      danger: true,
-      divider: true,
-      onClick: () => deleteEntry(entry),
-    });
-
-    return items;
-  };
-
   const buildEmptySpaceMenu = (): ContextMenuItem[] => [
     { label: "New folder", onClick: handleNewFolder },
     { label: "New file", onClick: handleNewFile },
@@ -147,7 +123,18 @@ export default function FileManager() {
     e.preventDefault();
     e.stopPropagation();
     setSelected(entry.path);
-    openContextMenu(e.clientX, e.clientY, buildEntryMenu(entry));
+
+    const items = buildEntryMenu(entry, {
+      onOpen: navigate,
+      onRename: startRename,
+      onDeleted: (deletedEntry) => {
+        if (selected === deletedEntry.path) setSelected(null);
+        refresh();
+      },
+      confirm,
+    });
+
+    openContextMenu(e.clientX, e.clientY, items);
   };
 
   const handleEmptySpaceContextMenu = (e: React.MouseEvent) => {
