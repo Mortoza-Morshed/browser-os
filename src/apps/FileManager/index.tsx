@@ -32,7 +32,8 @@ export default function FileManager() {
   }, [path]);
 
   useEffect(() => {
-    refresh();
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   // ── Core actions — each one is a plain function, no menu logic here ──

@@ -25,19 +25,19 @@ export default function TextEditor({ initialPath }: Props) {
     setPicking(true);
   }, []);
 
-  useEffect(() => {
-    if (initialPath) {
-      openFile(initialPath);
-    }
-  }, [initialPath]);
-
-  const openFile = async (path: string) => {
+  const openFile = useCallback(async (path: string) => {
     const text = await kernel.readFile(path);
     setContent(text);
     setCurrentPath(path);
     setSaved(true);
     setPicking(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!initialPath) return;
+    const timer = window.setTimeout(() => void openFile(initialPath), 0);
+    return () => window.clearTimeout(timer);
+  }, [initialPath, openFile]);
 
   const save = async () => {
     if (!currentPath) {

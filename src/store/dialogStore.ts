@@ -21,13 +21,23 @@ export const useDialogStore = create<DialogState>((set, get) => ({
   resolve: null,
 
   prompt: (title, defaultValue = "") =>
-    new Promise((resolve) => {
-      set({ kind: "prompt", title, defaultValue, resolve: resolve as any });
+    new Promise<string | null>((resolve) => {
+      set({
+        kind: "prompt",
+        title,
+        defaultValue,
+        resolve: (value) => resolve(typeof value === "string" || value === null ? value : null),
+      });
     }),
 
   confirm: (title, message) =>
-    new Promise((resolve) => {
-      set({ kind: "confirm", title, message, resolve: resolve as any });
+    new Promise<boolean>((resolve) => {
+      set({
+        kind: "confirm",
+        title,
+        message,
+        resolve: (value) => resolve(typeof value === "boolean" ? value : false),
+      });
     }),
 
   close: (value) => {

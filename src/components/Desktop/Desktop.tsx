@@ -69,7 +69,8 @@ export default function Desktop() {
   }, []);
 
   useEffect(() => {
-    refreshIcons();
+    const timer = window.setTimeout(() => void refreshIcons(), 0);
+    return () => window.clearTimeout(timer);
   }, [refreshIcons]);
 
   useEffect(() => {

@@ -4,26 +4,8 @@ import styles from "./DialogHost.module.css";
 
 export default function DialogHost() {
   const { kind, title, message, defaultValue, close } = useDialogStore();
-  const [value, setValue] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (kind === "prompt") {
-      setValue(defaultValue ?? "");
-      // Focus and select text on open
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 10);
-    }
-  }, [kind, defaultValue]);
 
   if (!kind) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    close(value.trim());
-  };
 
   return (
     <div
@@ -36,29 +18,7 @@ export default function DialogHost() {
         {message && <div className={styles.message}>{message}</div>}
 
         {kind === "prompt" && (
-          <form onSubmit={handleSubmit}>
-            <input
-              ref={inputRef}
-              className={styles.input}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") close(null);
-              }}
-            />
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.btnSecondary}
-                onClick={() => close(null)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className={styles.btnPrimary}>
-                OK
-              </button>
-            </div>
-          </form>
+          <PromptDialog defaultValue={defaultValue} close={close} />
         )}
 
         {kind === "confirm" && (
@@ -76,5 +36,55 @@ export default function DialogHost() {
         )}
       </div>
     </div>
+  );
+}
+
+function PromptDialog({
+  defaultValue,
+  close,
+}: {
+  defaultValue?: string;
+  close: (value: string | boolean | null) => void;
+}) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    close(value.trim());
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        ref={inputRef}
+        className={styles.input}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") close(null);
+        }}
+      />
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.btnSecondary}
+          onClick={() => close(null)}
+        >
+          Cancel
+        </button>
+        <button type="submit" className={styles.btnPrimary}>
+          OK
+        </button>
+      </div>
+    </form>
   );
 }
